@@ -1,0 +1,43 @@
+name: recon-bot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */8 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run bot
+        run: python bot.py
+
+      - name: Show warning if anti-bot detected
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("results.md")
+          text = p.read_text(encoding="utf-8") if p.exists() else ""
+          if "anti-bot / captcha pages detected" in text:
+              print("::warning::One or more targets returned anti-bot or CAPTCHA pages. Check results.md")
+          PY
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add results.md state.json
+          git diff --cached --quiet || git commit -m "Update recon results"
+          git push
